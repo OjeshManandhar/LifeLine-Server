@@ -11,6 +11,7 @@ from functools import wraps
 
 
 
+
 # Init app
 app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -36,6 +37,7 @@ traffic_ma = Marshmallow(app)
 class Driver(driver_db.Model):
     did = driver_db.Column(driver_db.Integer, primary_key=True)
     name = driver_db.Column(driver_db.String(100), unique=True)
+    pic_location = traffic_db.Column(traffic_db.String(100), unique=True)
     driver_id = driver_db.Column(driver_db.String(200), unique = True)
     email = driver_db.Column(driver_db.String(200))
     contact = driver_db.Column(driver_db.Integer, unique = True)
@@ -60,6 +62,7 @@ class DriverSchema(driver_ma.Schema):
 class Traffic(traffic_db.Model):
     tid = traffic_db.Column(traffic_db.Integer, primary_key=True)
     name = traffic_db.Column(traffic_db.String(100), unique=True)
+    pic_location = traffic_db.Column(traffic_db.String(100), unique=True)
     traffic_id = traffic_db.Column(traffic_db.String(200), unique = True)
     email = traffic_db.Column(traffic_db.String(200))
     contact = traffic_db.Column(traffic_db.Integer, unique = True)
@@ -111,15 +114,29 @@ drivers_schema = DriverSchema(many=True)
 # Sign up
 @app.route('/driver_signup', methods=['POST'])
 def Sign_up_driver():
+
     name = request.json['name']
     driver_id = request.json[ 'driver_id']
     email = request.json['email']
     contact = request.json['contact']
     password = request.json['password']
 
+    if 'file' not in request.files:
+        response = jsonify({'message' : 'No file part in the request'})
+        response.status_code = 400
+        return response
+    file = request.files['file']
+    if file.filename == '':
+        response = jsonify({'message' : 'No file selected for uploading'})
+        response.status_code = 400
+        return response
+    
+    pic_location = os.path.join(basedir,'User_pics/driver',name)
+    file.save(pic_location)
+
     hashed_password = generate_password_hash(password, method = 'sha256')
 
-    new_driver = Driver(name, driver_id, email, contact, hashed_password)
+    new_driver = Driver(name, driver_id, pic_location, email, contact, hashed_password)
 
     driver_db.session.add(new_driver)
     driver_db.session.commit()
@@ -214,9 +231,22 @@ def Sign_up_traffic():
     email = request.json['email']
     contact = request.json['contact']
     password = request.json['password']
+
+    if 'file' not in request.files:
+        response = jsonify({'message' : 'No file part in the request'})
+        response.status_code = 400
+        return response
+    file = request.files['file']
+    if file.filename == '':
+        response = jsonify({'message' : 'No file selected for uploading'})
+        response.status_code = 400
+        return response
+    
+    pic_location = os.path.join(basedir,'User_pics/traffic',name)
+    file.save(pic_location)
     hashed_password = generate_password_hash(password, method = 'sha256')
 
-    new_traffic = Traffic(name, traffic_id, email, contact, hashed_password)
+    new_traffic = Traffic(name, pic_location, traffic_id, email, contact, hashed_password)
     traffic_db.session.add(new_traffic)
     traffic_db.session.commit()
     return traffic_schema.jsonify(new_traffic)
@@ -288,6 +318,7 @@ def login_traffic():
         return jsonify({'token': token.decode('UTF-8')})
 
     return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
+
 
 
 
