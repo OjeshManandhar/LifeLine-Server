@@ -7,7 +7,7 @@ from flask_socketio import SocketIO, emit
 import jwt # token ko lai
 import datetime
 from functools import wraps 
-
+from werkzeug.utils import secure_filename
 
 
 
@@ -36,8 +36,6 @@ traffic_ma = Marshmallow(app)
 # Driver Class/Model
 class Driver(driver_db.Model):
     did = driver_db.Column(driver_db.Integer, primary_key=True)
-    name = driver_db.Column(driver_db.String(100), unique=True)
-    pic_location = traffic_db.Column(traffic_db.String(100), unique=True)
     driver_id = driver_db.Column(driver_db.String(200), unique = True)
     email = driver_db.Column(driver_db.String(200))
     contact = driver_db.Column(driver_db.Integer, unique = True)
@@ -62,16 +60,13 @@ class DriverSchema(driver_ma.Schema):
 class Traffic(traffic_db.Model):
     tid = traffic_db.Column(traffic_db.Integer, primary_key=True)
     name = traffic_db.Column(traffic_db.String(100), unique=True)
-    pic_location = traffic_db.Column(traffic_db.String(100), unique=True)
-    traffic_id = traffic_db.Column(traffic_db.String(200), unique = True)
     email = traffic_db.Column(traffic_db.String(200))
     contact = traffic_db.Column(traffic_db.Integer, unique = True)
     password = traffic_db.Column(traffic_db.String(200))
     
 
-    def __init__(self, name, traffic_id, email, contact, password):
+    def __init__(self, name, email, contact, password):
         self.name = name
-        self.traffic_id = traffic_id
         self.email = email
         self.contact = contact
         self.password = password
@@ -84,7 +79,7 @@ class Traffic(traffic_db.Model):
 
 class TrafficSchema(traffic_ma.Schema):
     class Meta:
-        fields = ('id', 'name', 'traffic_id', 'email', 'contact', 'password')
+        fields = ('id', 'name', 'email', 'contact', 'password')
 
 def token_required(f):
     @wraps(f)
@@ -121,22 +116,9 @@ def Sign_up_driver():
     contact = request.json['contact']
     password = request.json['password']
 
-    if 'file' not in request.files:
-        response = jsonify({'message' : 'No file part in the request'})
-        response.status_code = 400
-        return response
-    file = request.files['file']
-    if file.filename == '':
-        response = jsonify({'message' : 'No file selected for uploading'})
-        response.status_code = 400
-        return response
-    
-    pic_location = os.path.join(basedir,'User_pics/driver',name)
-    file.save(pic_location)
-
     hashed_password = generate_password_hash(password, method = 'sha256')
 
-    new_driver = Driver(name, driver_id, pic_location, email, contact, hashed_password)
+    new_driver = Driver(name, driver_id, email, contact, hashed_password)
 
     driver_db.session.add(new_driver)
     driver_db.session.commit()
@@ -227,26 +209,13 @@ traffics_schema = TrafficSchema(many=True)
 @app.route('/traffic_signup', methods=['POST'])
 def Sign_up_traffic():
     name = request.json['name']
-    traffic_id = request.json['traffic_id']
     email = request.json['email']
     contact = request.json['contact']
     password = request.json['password']
 
-    if 'file' not in request.files:
-        response = jsonify({'message' : 'No file part in the request'})
-        response.status_code = 400
-        return response
-    file = request.files['file']
-    if file.filename == '':
-        response = jsonify({'message' : 'No file selected for uploading'})
-        response.status_code = 400
-        return response
-    
-    pic_location = os.path.join(basedir,'User_pics/traffic',name)
-    file.save(pic_location)
     hashed_password = generate_password_hash(password, method = 'sha256')
 
-    new_traffic = Traffic(name, pic_location, traffic_id, email, contact, hashed_password)
+    new_traffic = Traffic(name, email, contact, hashed_password)
     traffic_db.session.add(new_traffic)
     traffic_db.session.commit()
     return traffic_schema.jsonify(new_traffic)
@@ -274,17 +243,15 @@ def update_traffic(id):
 
 
     name = request.json['name']
-    traffic_id = request.json['traffic_id']
     email = request.json['email']
     contact = request.json['contact']
     password = request.json['password']
 
     traffic.name = name
-    traffic.traffic_id = traffic_id
     traffic.email = email
     traffic.contact = contact
     traffic.password = password
-    new_traffic = Traffic(name, traffic_id, email, contect, password)
+    new_traffic = Traffic(name, email, contect, password)
 
     traffic_db.session.commit()
 
@@ -319,10 +286,30 @@ def login_traffic():
 
     return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
-
+@app.route('/file_upload', methods=['POST'])
+def upload_file():
+    # check if the post request has the file part
+    print(request.files)
+    # check if the post request has the file part
+    if 'file' not in request.files:
+        response = jsonify({'message' : 'No file part in the request'})
+        response.status_code = 400
+        return response
+    file = request.files['file']
+    print(file)
+    if file.filename == '':
+        response = jsonify({'message' : 'No file selected for uploading'})
+        response.status_code = 400
+        return response
+    
+    filename = secure_filename(file.filename)
+    file.save(os.path.join(basedir, filename))
+    response = jsonify({'message' : 'File successfully uploaded'})
+    response.status_code = 201
+    return response
 
 
 # Runserver
-if __name__ == "__main__":
+if __name__ == "__main__":  
     socket.run(app, debug = True)
     #app.run(debug=True)
