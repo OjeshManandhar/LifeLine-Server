@@ -11,7 +11,6 @@ from werkzeug.utils import secure_filename
 
 
 
-
 # Init app
 app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -40,20 +39,22 @@ class Driver(driver_db.Model):
     email = driver_db.Column(driver_db.String(200))
     contact = driver_db.Column(driver_db.Integer, unique = True)
     password = driver_db.Column(driver_db.String(200))
+    pic_location = driver_db.Column(driver_db.String(200))
 
 
-    def __init__(self, name, driver_id, email, contact, password):
+    def __init__(self, name, driver_id, email, contact, password, pic_location):
         self.name = name
         self.driver_id = driver_id
         self.email = email
         self.contact = contact
         self.password = password
+        self.pic_location = pic_location
         
 
 # Driver Schema
 class DriverSchema(driver_ma.Schema):
     class Meta:
-        fields = ('id', 'name', 'driver_id', 'email', 'contact', 'password')
+        fields = ('id', 'name', 'driver_id', 'email', 'contact', 'password', 'pic_location')
 
 
 # Traffic Class/Model
@@ -63,23 +64,22 @@ class Traffic(traffic_db.Model):
     email = traffic_db.Column(traffic_db.String(200))
     contact = traffic_db.Column(traffic_db.Integer, unique = True)
     password = traffic_db.Column(traffic_db.String(200))
+    pic_location = driver_db.Column(driver_db.String(200))
     
 
-    def __init__(self, name, email, contact, password):
+    def __init__(self, name, email, contact, password, pic_location):
         self.name = name
         self.email = email
         self.contact = contact
         self.password = password
+        self.pic_location = pic_location
 
 
-        
 
 # Traffic Schema
-
-
 class TrafficSchema(traffic_ma.Schema):
     class Meta:
-        fields = ('id', 'name', 'email', 'contact', 'password')
+        fields = ('id', 'name', 'email', 'contact', 'password', 'pic_location')
 
 def token_required(f):
     @wraps(f)
@@ -116,9 +116,23 @@ def Sign_up_driver():
     contact = request.json['contact']
     password = request.json['password']
 
+    if 'file' not in request.files:
+        response = jsonify({'message' : 'No file part in the request'})
+        response.status_code = 400
+        return response
+    file = request.files['file']
+    if file.filename == '':
+        response = jsonify({'message' : 'No file selected for uploading'})
+        response.status_code = 400
+        return response
+    
+    pic_location = os.path.join(basedir, 'User_pics/driver', name)
+    file.save(pic_location)
+    
+
     hashed_password = generate_password_hash(password, method = 'sha256')
 
-    new_driver = Driver(name, driver_id, email, contact, hashed_password)
+    new_driver = Driver(name, driver_id, email, contact, hashed_password, pic_location)
 
     driver_db.session.add(new_driver)
     driver_db.session.commit()
@@ -197,10 +211,6 @@ def login():
 
 
 
-
-
-
-
 # Init traffic schema
 traffic_schema = TrafficSchema()
 traffics_schema = TrafficSchema(many=True)
@@ -215,7 +225,22 @@ def Sign_up_traffic():
 
     hashed_password = generate_password_hash(password, method = 'sha256')
 
-    new_traffic = Traffic(name, email, contact, hashed_password)
+    if 'file' not in request.files:
+        response = jsonify({'message' : 'No file part in the request'})
+        response.status_code = 400
+        return response
+    file = request.files['file']
+    if file.filename == '':
+        response = jsonify({'message' : 'No file selected for uploading'})
+        response.status_code = 400
+        return response
+    
+    pic_location = os.path.join(basedir, 'User_pics/traffic', name)
+    file.save(pic_location)
+    
+    hashed_password = generate_password_hash(password, method = 'sha256')
+    
+    new_traffic = Traffic(name, email, contact, hashed_password, pic_location)
     traffic_db.session.add(new_traffic)
     traffic_db.session.commit()
     return traffic_schema.jsonify(new_traffic)
