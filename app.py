@@ -86,6 +86,7 @@ class TrafficSchema(traffic_ma.Schema):
     class Meta:
         fields = ('id', 'name', 'email', 'contact', 'password', 'pic_location')
 
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -150,7 +151,7 @@ def upload_driver_pic(contact):
         response.status_code = 400
         return response
 
-    pic_loc = os.path.join(basedir, "User_pics/driver",str(driver.contact))
+    pic_loc = os.path.join(basedir, "User_pics/driver",(str(driver.contact)+file.filename[-4:]))
     file.save(pic_loc)
     driver.put_pic_loc(pic_loc)
     response = jsonify({'message' : 'File successfully uploaded'})
@@ -268,7 +269,7 @@ def upload_traffic_pic(contact):
         response.status_code = 400
         return response
         
-    pic_loc = os.path.join(basedir, "User_pics/traffic",str(traffic.contact))
+    pic_loc = os.path.join(basedir, "User_pics/traffic",(str(traffic.contact)+file.filename[-4:]))
     file.save(pic_loc)
     traffic.put_pic_loc(pic_loc)
     response = jsonify({'message' : 'File successfully uploaded'})
