@@ -132,9 +132,8 @@ def Sign_up_driver():
 
     return driver_schema.jsonify(new_driver)
 
-@app.route('/driver_pic/<contact>', methods=['POST'])
-def upload_driver_pic(contact):
-    # check if the post request has the file part
+@app.route('/update_driver_pic/<contact>', methods=['POST'])
+def update_driver_pic(contact):
     driver = Driver.query.filter_by(contact = contact).first()
     # check if the post request has the file part
     if 'file' not in request.files:
@@ -164,6 +163,12 @@ def get_drivers():
     all_drivers = Driver.query.all()    
     result = drivers_schema.dump(all_drivers) #array vayeko le
     return jsonify(result)
+
+# Get Drivers pic
+@app.route('/get_driver_pic/<contact>', methods=['GET'])
+def get_driver_pic(contact):
+    driver = Driver.query.filter_by(contact = contact).first()
+    return send_file(driver.pic_location)
 
 # Get single drivers 
 @app.route('/driver/<id>', methods=['GET'])
@@ -250,8 +255,8 @@ def Sign_up_traffic():
     traffic_db.session.commit()
     return traffic_schema.jsonify(new_traffic)
 
-@app.route('/traffic_pic/<contact>', methods=['POST'])
-def upload_traffic_pic(contact):
+@app.route('/update_traffic_pic/<contact>', methods=['POST'])
+def update_traffic_pic(contact):
     # check if the post request has the file part\
     traffic = Traffic.query.filter_by(contact = contact).first()
     # check if the post request has the file part
@@ -282,6 +287,12 @@ def get_traffics():
     all_traffics = Traffic.query.all()    
     result = traffics_schema.dump(all_traffics) #array vayeko le
     return jsonify(result)
+
+# Get Traffic pic
+@app.route('/get_traffic_pic/<contact>', methods=['GET'])
+def get_traffic_pic(contact):
+    traffic = Traffic.query.filter_by(contact = contact).first()
+    return send_file(traffic.pic_location)
 
 # Get single traffics 
 @app.route('/traffic/<id>', methods=['GET'])
