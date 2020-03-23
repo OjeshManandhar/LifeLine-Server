@@ -8,7 +8,7 @@ import jwt # token ko lai
 import datetime
 from functools import wraps 
 from werkzeug.utils import secure_filename
-
+from flask import send_file
 
 
 # Init app
@@ -346,7 +346,7 @@ def login_traffic():
 
 
 
-
+#Test section   
 @app.route('/file_upload', methods=['POST'])
 def upload_file():
     # check if the post request has the file part
@@ -368,6 +368,9 @@ def upload_file():
     response.status_code = 201
     return response
 
+@app.route('/get_image')
+def get_image():
+    return send_file(os.path.join(basedir, "pic.png"))
 
 # Runserver
 if __name__ == "__main__":  
