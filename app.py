@@ -54,6 +54,12 @@ class Driver(driver_db.Model):
     def put_pic_loc(self, pic_location):
         self.pic_location = pic_location
 
+    def update_data(self, name, driver_id, email, contact):
+        self.name = name
+        self.driver_id = driver_id
+        self.email = email
+        self.contact = contact
+
 
 # Driver Schema
 class DriverSchema(driver_ma.Schema):
@@ -69,7 +75,7 @@ class Traffic(traffic_db.Model):
     email = traffic_db.Column(traffic_db.String(200), unique=True)
     contact = traffic_db.Column(traffic_db.Integer, unique=True)
     password = traffic_db.Column(traffic_db.String(200))
-    pic_location = driver_db.Column(driver_db.String(200))
+    pic_location = traffic_db.Column(traffic_db.String(200))
 
     def __init__(self, name, email, contact, password):
         self.name = name
@@ -79,6 +85,11 @@ class Traffic(traffic_db.Model):
 
     def put_pic_loc(self, pic_location):
         self.pic_location = pic_location
+
+    def update_data(self, name, email, contact):
+        self.name = name
+        self.email = email
+        self.contact = contact
 
 
 # Traffic Schema
@@ -187,20 +198,13 @@ def update_driver(contact):
 
     if not driver:
         return jsonify({'message': 'no driver found'})
-
-    name = request.json['name']
-    driver_id = request.json['driver_id']
-    email = request.json['email']
-    contact = request.json['contact']
-    password = request.json['password']
-
-    driver.name = name
-    driver.driver_id = driver_id
-    driver.email = email
-    driver.contact = contact
-    driver.password = password
-    new_driver = Driver(name, driver_id, email, contect, password)
-
+    print(driver.contact, request.json['contact'])
+    if driver.contact != request.json['contact']:
+        pic_loc = os.path.join(basedir, "User_pics/driver",
+                           (str(request.json['contact'])+driver.pic_location[-4:]))
+        os.rename(driver.pic_location,pic_loc)
+        driver.put_pic_loc(pic_loc)
+    driver.update_data(request.json['name'], request.json['driver_id'], request.json['email'], request.json['contact'])
     driver_db.session.commit()
 
     return driver_schema.jsonify(driver)
@@ -306,23 +310,20 @@ def get_traffic(contact):
 @app.route('/traffic/<contact>', methods=['PUT'])
 def update_traffic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
+
     if not traffic:
         return jsonify({'message': 'no traffic found'})
 
-    name = request.json['name']
-    email = request.json['email']
-    contact = request.json['contact']
-    password = request.json['password']
-
-    traffic.name = name
-    traffic.email = email
-    traffic.contact = contact
-    traffic.password = password
-    new_traffic = Traffic(name, email, contect, password)
-
+    if traffic.contact != request.json['contact']:
+        pic_loc = os.path.join(basedir, "User_pics/traffic",
+                           (str(request.json['contact'])+traffic.pic_location[-4:]))
+        os.rename(traffic.pic_location,pic_loc)
+        traffic.put_pic_loc(pic_loc)
+    traffic.update_data(request.json['name'], request.json['email'], request.json['contact'])
     traffic_db.session.commit()
 
     return traffic_schema.jsonify(traffic)
+
 
 # Delete traffics
 @app.route('/traffic/<contact>', methods=['DELETE'])
