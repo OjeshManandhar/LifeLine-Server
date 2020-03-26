@@ -209,6 +209,7 @@ def update_driver(contact):
 @app.route('/driver/<contact>', methods=['DELETE'])
 def delete_driver(contact):
     driver = Driver.query.filter_by(contact=contact).first()
+    os.remove(driver.pic_location)
     if not driver:
         return jsonify({'message': 'no driver found'})
     driver_db.session.delete(driver)
@@ -329,6 +330,7 @@ def delete_traffic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
     if not traffic:
         return jsonify({'message': 'no traffic found'})
+    os.remove(traffic.pic_location)
     traffic_db.session.delete(traffic)
     traffic_db.session.commit()
     return traffic_schema.jsonify(traffic)
