@@ -215,6 +215,8 @@ def delete_driver(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     try:
         os.remove(driver.pic_location)
+    except:
+        print("no_pic-")
     if not driver:
         return jsonify({'message': 'no driver found'})
     driver_db.session.delete(driver)
@@ -334,6 +336,8 @@ def delete_traffic(contact):
         return jsonify({'message': 'no traffic found'})
     try:
         os.remove(traffic.pic_location)
+    except:
+        print("no_pic-")
     traffic_db.session.delete(traffic)
     traffic_db.session.commit()
     return traffic_schema.jsonify(traffic)
