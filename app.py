@@ -231,7 +231,7 @@ def login():
     if not auth or not auth.username or not auth.password:
         return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
-    driver = Driver.query.filter_by(name=auth.username).first()
+    driver = Driver.query.filter_by(number=auth.username).first()
 
     if not driver:
         return make_response('Could not verify2', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
@@ -350,7 +350,7 @@ def login_traffic():
     if not auth or not auth.username or not auth.password:
         return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
-    traffic = Traffic.query.filter_by(name=auth.username).first()
+    traffic = Traffic.query.filter_by(number=auth.username).first()
 
     if not traffic:
         return make_response('Could not verify2', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
