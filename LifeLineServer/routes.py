@@ -4,6 +4,7 @@ import os
 from flask import send_file
 import datetime
 from werkzeug.utils import secure_filename
+from flask_socketio import emit, send
 
 # password lai hash garna
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -303,3 +304,14 @@ def upload_file():
 @app.route('/get_image')
 def get_image():
     return send_file(os.path.join(basedir, "pic.png"))
+
+
+
+
+
+#socket
+
+@socket.on('gps')
+def distribute_gps(gps):
+    emit('details',jsonify({'gps': gps}), broadcast = True)
+     
