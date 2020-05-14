@@ -20,20 +20,19 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = None
 
-        if 'x-access-token' in request.headers:
-            token = request.headers['x-access-token']
+#        if 'x-access-token' in request.headers:
+#            token = request.headers['x-access-token']
+        token = request.args.get('token')
 
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
 
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'])
-            current_user = User.query.filter_by(
-                public_id=data['public_id']).first()
         except:
-            return jsonify({'message': 'Token is invalid!'}), 401
+            return jsonify({'message': 'Token is invalid!'}), 402
 
-        return f(current_user, *args, **kwargs)
+        return f(*args, **kwargs)
 
     return decorated
 
@@ -98,18 +97,22 @@ def get_drivers():
 
 # Get Drivers pic
 @app.route('/get_driver_pic/<contact>', methods=['GET'])
+#@token_required
+
 def get_driver_pic(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     return send_file(driver.pic_location)
 
 # Get single drivers
 @app.route('/driver/<contact>', methods=['GET'])
+#@token_required
 def get_driver(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     return driver_schema.jsonify(driver)
 
 # Update a Driver
 @app.route('/driver/<contact>', methods=['PUT'])
+#@token_required
 def update_driver(contact):
     driver = Driver.query.filter_by(contact=contact).first()
 
@@ -128,6 +131,7 @@ def update_driver(contact):
 
 # Delete drivers
 @app.route('/driver/<contact>', methods=['DELETE'])
+#@token_required
 def delete_driver(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     try:
@@ -154,7 +158,7 @@ def login():
         return make_response('Could not verify2', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
     if check_password_hash(driver.password, auth.password):
-        token = jwt.encode({'id': driver.did}, app.config['SECRET_KEY'])
+        token = jwt.encode({'id': driver.contact}, app.config['SECRET_KEY'])
         return jsonify({'token': token.decode('UTF-8')})
 
     return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
@@ -313,5 +317,6 @@ def get_image():
 
 @socket.on('gps')
 def distribute_gps(gps):
+    print(gps)
     emit('details',jsonify({'gps': gps}), broadcast = True)
      
