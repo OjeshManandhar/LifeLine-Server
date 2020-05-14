@@ -315,7 +315,7 @@ def get_image():
 
 #socket
 
-@socket.on('gps')
+@socket.on('gpspos')
 def distribute_gps(gps):
     print(gps)
     emit('details',jsonify({'gps': gps}), broadcast = True)

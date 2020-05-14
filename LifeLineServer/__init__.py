@@ -16,7 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + \
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-socket = SocketIO(app)
+socket = SocketIO(app, cors_allowed_origins='*')
 
 # Init driver_db
 driver_db = SQLAlchemy(app)
