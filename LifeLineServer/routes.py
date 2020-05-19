@@ -4,7 +4,7 @@ import os
 from flask import send_file
 import datetime
 from werkzeug.utils import secure_filename
-from flask_socketio import emit, send
+
 
 # password lai hash garna
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -15,6 +15,7 @@ from LifeLineServer.models import Driver, Traffic, DriverSchema, TrafficSchema
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -23,12 +24,12 @@ def token_required(f):
 #        if 'x-access-token' in request.headers:
 #            token = request.headers['x-access-token']
         token = request.args.get('token')
-
         if not token:
             return jsonify({'message': 'Token is missing!'}), 401
 
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'])
+            #current_user = Driver.query.filter_by(contact=data["id"]).first()
         except:
             return jsonify({'message': 'Token is invalid!'}), 402
 
@@ -315,8 +316,8 @@ def get_image():
 
 #socket
 
-@socket.on('gpspos')
-def distribute_gps(gps):
-    print(gps)
-    emit('details',jsonify({'gps': gps}), broadcast = True)
-     
+# @socket.on('message')
+# def handleMessage(msg):
+#     print('Message: ' + msg)
+#     send(msg, broadcast=True)
+
