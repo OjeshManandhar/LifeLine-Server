@@ -83,6 +83,12 @@ def update_driver_pic(contact):
 
     pic_loc = os.path.join(basedir, "User_pics/driver",
                            (str(driver.contact)+file.filename[-4:]))
+    
+    try:
+        os.remove(driver.pic_location)
+    except:
+        print("new pic")
+
     file.save(pic_loc)
     driver.put_pic_loc(pic_loc)
     response = jsonify({'message': 'File successfully uploaded'})
@@ -203,6 +209,11 @@ def update_traffic_pic(contact):
         response = jsonify({'message': 'png or jpg not selected'})
         response.status_code = 400
         return response
+
+    try:
+        os.remove(traffic.pic_location)
+    except:
+        print("new pic")
 
     pic_loc = os.path.join(basedir, "User_pics/traffic",
                            (str(traffic.contact)+file.filename[-4:]))
