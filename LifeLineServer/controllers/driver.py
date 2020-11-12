@@ -13,7 +13,6 @@ from functools import wraps
 
 from LifeLineServer.models import Driver, DriverSchema
 
-basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 def token_required(f):
@@ -44,6 +43,7 @@ def token_required(f):
 # Init schema
 driver_schema = DriverSchema()
 drivers_schema = DriverSchema(many=True)
+
 
 # Sign up
 @app.route('/driver_signup', methods=['POST'])

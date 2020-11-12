@@ -13,8 +13,6 @@ from functools import wraps
 
 from LifeLineServer.models import Driver, Traffic, DriverSchema, TrafficSchema
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -43,12 +41,16 @@ def token_required(f):
 
 # Get single traffics
 @app.route('/traffic/<contact>', methods=['GET'])
-@token_required
+# @token_required
 def get_traffic(actual_user, contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
     return traffic_schema.jsonify(traffic)
 
-# Update a Trafficiontact=contact).first()
+# Update a Traffic
+@app.route('/trffic/<contact>', methods=['PUT'])
+#@token_required
+def update_trffic(contact):
+    trffic = Trffic.query.filter_by(contact=contact).first()
 
     if not traffic:
         return jsonify({'message': 'no traffic found'})
