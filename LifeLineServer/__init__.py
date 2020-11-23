@@ -30,3 +30,4 @@ traffic_ma = Marshmallow(app)
 
 
 from LifeLineServer import routes
+from LifeLineServer import projectsocket
