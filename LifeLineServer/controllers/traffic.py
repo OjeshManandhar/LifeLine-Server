@@ -47,10 +47,10 @@ def get_traffic(actual_user, contact):
     return traffic_schema.jsonify(traffic)
 
 # Update a Traffic
-@app.route('/trffic/<contact>', methods=['PUT'])
+@app.route('/traffic/<contact>', methods=['PUT'])
 #@token_required
-def update_trffic(contact):
-    trffic = Trffic.query.filter_by(contact=contact).first()
+def update_traffic(contact):
+    traffic = Traffic.query.filter_by(contact=contact).first()
 
     if not traffic:
         return jsonify({'message': 'no traffic found'})
