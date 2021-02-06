@@ -5,6 +5,9 @@ from flask import send_file
 import datetime
 from werkzeug.utils import secure_filename
 
+from PIL import Image
+from io import BytesIO
+import base64
 
 # password lai hash garna
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -85,7 +88,7 @@ def Sign_up_traffic():
     return traffic_schema.jsonify(new_traffic)
 
 
-@app.route('/update_traffic_pic/<contact>', methods=['POST'])
+@app.route('/traffic_pic/<contact>', methods=['POST'])
 def update_traffic_pic(contact):
     # check if the post request has the file part\
     traffic = Traffic.query.filter_by(contact=contact).first()
@@ -113,9 +116,11 @@ def update_traffic_pic(contact):
                            (str(traffic.contact)+file.filename[-4:]))
     file.save(pic_loc)
     traffic.put_pic_loc(pic_loc)
+
     response = jsonify({'message': 'File successfully uploaded'})
     traffic_db.session.commit()
     return response
+    
 
 # Get Traffics
 @app.route('/traffic', methods=['GET'])
@@ -130,7 +135,16 @@ def get_traffic_pic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
     return send_file(traffic.pic_location)
 
-
+# Get Traffic small pic
+@app.route('/traffic_small_pic/<contact>', methods=['GET'])
+def traffic_small_pic(contact):
+    traffic = Traffic.query.filter_by(contact=contact).first()
+    image = Image.open(traffic.pic_location)
+    new_image = image.resize((100, 100))
+    buff = BytesIO()
+    new_image.save(buff, format="JPEG")
+    img_str = base64.b64encode(buff.getvalue())
+    return b'data:image/jpg;base64,'+img_str
 
 # Delete traffics
 @app.route('/traffic/<contact>', methods=['DELETE'])
@@ -160,8 +174,8 @@ def login_traffic():
         return make_response('Could not verify2', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
     if check_password_hash(traffic.password, auth.password):
-        token = jwt.encode({'id': traffic.tid, 'role': "traffic"}, app.config['SECRET_KEY'])
-        return jsonify({'token': token.decode('UTF-8')})
+        token = jwt.encode({'id': traffic.contact, 'role': "traffic"}, app.config['SECRET_KEY'])
+        return jsonify({'token': token.decode('UTF-8'), 'contact': traffic.contact, 'name': traffic.name, 'role': 'Traffic'})
 
     return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 

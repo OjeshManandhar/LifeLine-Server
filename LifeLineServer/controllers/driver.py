@@ -5,6 +5,10 @@ from flask import send_file
 import datetime
 from werkzeug.utils import secure_filename
 
+from PIL import Image
+from io import BytesIO
+import base64
+
 
 # password lai hash garna
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -66,7 +70,7 @@ def Sign_up_driver():
     return driver_schema.jsonify(new_driver)
 
 
-@app.route('/update_driver_pic/<contact>', methods=['POST'])
+@app.route('/driver_pic/<contact>', methods=['POST'])
 def update_driver_pic(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     # check if the post request has the file part
@@ -106,12 +110,25 @@ def get_drivers():
     return jsonify(result)
 
 # Get Drivers pic
-@app.route('/get_driver_pic/<contact>', methods=['GET'])
+@app.route('/driver_pic/<contact>', methods=['GET'])
 #@token_required
 
 def get_driver_pic(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     return send_file(driver.pic_location)
+
+# Get driver small pic
+@app.route('/driver_small_pic/<contact>', methods=['GET'])
+def get_driver_small_pic(contact):
+    driver = Driver.query.filter_by(contact=contact).first()
+    image = Image.open(driver.pic_location)
+    new_image = image.resize((100, 100))
+    buff = BytesIO()
+    new_image.save(buff, format="JPEG")
+    img_str = base64.b64encode(buff.getvalue())
+    print(type(img_str))
+    return b'data:image/jpg;base64,'+img_str
+
 
 # Get single drivers
 @app.route('/driver/<contact>', methods=['GET'])
@@ -158,6 +175,7 @@ def delete_driver(contact):
 @app.route('/driver_login', methods=['POST'])
 def login():
     auth = request.authorization
+    print(request)
 
     if not auth or not auth.username or not auth.password:
         return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
@@ -168,7 +186,7 @@ def login():
         return make_response('Could not verify2', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
     if check_password_hash(driver.password, auth.password):
-        token = jwt.encode({'id': driver.contact}, app.config['SECRET_KEY'])
-        return jsonify({'token': token.decode('UTF-8')})
+        token = jwt.encode({'id': driver.contact, 'role': "driver"}, app.config['SECRET_KEY'])
+        return jsonify({'token': token.decode('UTF-8'), 'contact': driver.contact, 'name': driver.name, 'role': 'Driver'})
 
     return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
