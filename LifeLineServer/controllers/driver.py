@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 from io import BytesIO
 import base64
+import re 
 
 
 # password lai hash garna
@@ -58,16 +59,19 @@ def Sign_up_driver():
     email = request.json['email']
     contact = request.json['contact']
     password = request.json['password']
-    pic_location = os.path.join(basedir, 'User_pics/driver', name)
+    email_regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
+    if(re.search(email_regex,email) and len(str(contact)) == 10 and len(password)>7): 
+        hashed_password = generate_password_hash(password, method='sha256')
+        new_driver = Driver(name, driver_id, email, contact, hashed_password)
+        driver_db.session.add(new_driver)
+        try:
+            driver_db.session.commit()
+        except exc.SQLAlchemyError as e:
+            return jsonify({'message': str(e.__dict__['orig'])})
+        return driver_schema.jsonify(new_driver)
+    else:
+        return jsonify({'message': 'Signup Unsuccessful invalid data'})
 
-    hashed_password = generate_password_hash(password, method='sha256')
-
-    new_driver = Driver(name, driver_id, email, contact, hashed_password)
-
-    driver_db.session.add(new_driver)
-    driver_db.session.commit()
-
-    return driver_schema.jsonify(new_driver)
 
 
 @app.route('/driver_pic/<contact>', methods=['POST'])
@@ -107,7 +111,20 @@ def update_driver_pic(contact):
 def get_drivers():
     all_drivers = Driver.query.all()
     result = drivers_schema.dump(all_drivers)  # array vayeko le
-    return jsonify(result)
+    contact = request.args.get('contact')
+    name = request.args.get('name')
+    final_result = []
+    if (contact or name):
+        for user in result:
+            if name:
+                if name in user['name']:
+                    final_result.append(user)
+            if contact:
+                if str(contact) in str(user['contact']):
+                    final_result.append(user)
+    else:
+        final_result = result
+    return jsonify(final_result)
 
 # Get Drivers pic
 @app.route('/driver_pic/<contact>', methods=['GET'])
@@ -115,18 +132,22 @@ def get_drivers():
 
 def get_driver_pic(contact):
     driver = Driver.query.filter_by(contact=contact).first()
-    return send_file(driver.pic_location)
+    if driver.pic_location:
+        return send_file(driver.pic_location)
+    else:
+        return jsonify({'message': 'No picture updated'})
 
 # Get driver small pic
 @app.route('/driver_small_pic/<contact>', methods=['GET'])
 def get_driver_small_pic(contact):
     driver = Driver.query.filter_by(contact=contact).first()
+    if (not (driver.pic_location)):
+        return jsonify({'message': 'No picture updated'})
     image = Image.open(driver.pic_location)
     new_image = image.resize((100, 100))
     buff = BytesIO()
     new_image.save(buff, format="JPEG")
     img_str = base64.b64encode(buff.getvalue())
-    print(type(img_str))
     return b'data:image/jpg;base64,'+img_str
 
 
@@ -187,6 +208,6 @@ def login():
 
     if check_password_hash(driver.password, auth.password):
         token = jwt.encode({'id': driver.contact, 'role': "driver"}, app.config['SECRET_KEY'])
-        return jsonify({'token': token.decode('UTF-8'), 'contact': driver.contact, 'name': driver.name, 'role': 'Driver'})
+        return jsonify({'token': token.decode('UTF-8'), 'contact': driver.contact, 'name': driver.name, 'role': 'driver'})
 
     return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})

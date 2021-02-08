@@ -8,6 +8,8 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 from io import BytesIO
 import base64
+import re 
+from sqlalchemy import exc
 
 # password lai hash garna
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -79,13 +81,18 @@ def Sign_up_traffic():
     email = request.json['email']
     contact = request.json['contact']
     password = request.json['password']
-
-    hashed_password = generate_password_hash(password, method='sha256')
-
-    new_traffic = Traffic(name, email, contact, hashed_password)
-    traffic_db.session.add(new_traffic)
-    traffic_db.session.commit()
-    return traffic_schema.jsonify(new_traffic)
+    email_regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
+    if(re.search(email_regex,email) and len(str(contact)) == 10 and len(password)>7): 
+        hashed_password = generate_password_hash(password, method='sha256')
+        new_traffic = Traffic(name, email, contact, hashed_password)
+        traffic_db.session.add(new_traffic)
+        try:
+            traffic_db.session.commit()
+        except exc.SQLAlchemyError as e:
+            return jsonify({'message': str(e.__dict__['orig'])})
+        return traffic_schema.jsonify(new_traffic)
+    else:
+        return jsonify({'message': 'Signup Unsuccessful invalid data'})
 
 
 @app.route('/traffic_pic/<contact>', methods=['POST'])
@@ -127,18 +134,37 @@ def update_traffic_pic(contact):
 def get_traffics():
     all_traffics = Traffic.query.all()
     result = traffics_schema.dump(all_traffics)  # array vayeko le
-    return jsonify(result)
+    contact = request.args.get('contact')
+    name = request.args.get('name')
+    final_result = []
+    if (contact or name):
+        for user in result:
+            if name:
+                if name in user['name']:
+                    final_result.append(user)
+            if contact:
+                if str(contact) in str(user['contact']):
+                    final_result.append(user)
+    else:
+        final_result = result
+    return jsonify(final_result)
 
 # Get Traffic pic
-@app.route('/get_traffic_pic/<contact>', methods=['GET'])
+@app.route('/traffic_pic/<contact>', methods=['GET'])
 def get_traffic_pic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
-    return send_file(traffic.pic_location)
+    if   traffic.pic_location:
+        return send_file(traffic.pic_location)
+    else:
+        return jsonify({'message': 'No picture updated'})
 
 # Get Traffic small pic
 @app.route('/traffic_small_pic/<contact>', methods=['GET'])
 def traffic_small_pic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
+    if (not traffic.pic_location):
+        return jsonify({'message': 'No picture updated'})
+        
     image = Image.open(traffic.pic_location)
     new_image = image.resize((100, 100))
     buff = BytesIO()
@@ -175,7 +201,7 @@ def login_traffic():
 
     if check_password_hash(traffic.password, auth.password):
         token = jwt.encode({'id': traffic.contact, 'role': "traffic"}, app.config['SECRET_KEY'])
-        return jsonify({'token': token.decode('UTF-8'), 'contact': traffic.contact, 'name': traffic.name, 'role': 'Traffic'})
+        return jsonify({'token': token.decode('UTF-8'), 'contact': traffic.contact, 'name': traffic.name, 'role': 'traffic'})
 
     return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
