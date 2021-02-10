@@ -4,6 +4,11 @@ from LifeLineServer import *
 
 socket_distribution_object = {"obstructions":[], "driver_routes":[], "driver_gps":[], "traffic_gps":[]}
 #ignore last ma garne 
+
+@socket.on('connect')
+def handle_connect():
+    send(socket_distribution_object)
+
 @socket.on('obstruction')
 def handle_obstruction(data):
     operation = data['operation']
