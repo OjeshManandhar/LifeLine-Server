@@ -47,7 +47,7 @@ def token_required(f):
 # Get single traffics
 @app.route('/traffic/<contact>', methods=['GET'])
 # @token_required
-def get_traffic(actual_user, contact):
+def get_traffic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
     return traffic_schema.jsonify(traffic)
 

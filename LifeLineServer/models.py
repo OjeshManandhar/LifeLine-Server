@@ -9,6 +9,7 @@ class Driver(driver_db.Model):
     contact = driver_db.Column(driver_db.Integer, unique=True)
     password = driver_db.Column(driver_db.String(200))
     pic_location = driver_db.Column(driver_db.String(200))
+    role = 'driver'
 
     def __init__(self, name, driver_id, email, contact, password):
         self.name = name
@@ -31,7 +32,7 @@ class Driver(driver_db.Model):
 class DriverSchema(driver_ma.Schema):
     class Meta:
         fields = ('id', 'name', 'driver_id', 'email',
-                  'contact', 'password', 'pic_location')
+                  'contact', 'password', 'pic_location', 'role')
 
 
 # Traffic Class/Model
@@ -42,6 +43,7 @@ class Traffic(traffic_db.Model):
     contact = traffic_db.Column(traffic_db.Integer, unique=True)
     password = traffic_db.Column(traffic_db.String(200))
     pic_location = traffic_db.Column(traffic_db.String(200))
+    role='traffic'
 
     def __init__(self, name, email, contact, password):
         self.name = name
@@ -61,4 +63,4 @@ class Traffic(traffic_db.Model):
 # Traffic Schema
 class TrafficSchema(traffic_ma.Schema):
     class Meta:
-        fields = ('id', 'name', 'email', 'contact', 'password', 'pic_location')
+        fields = ('id', 'name', 'email', 'contact', 'password', 'pic_location', 'role')
