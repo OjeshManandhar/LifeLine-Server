@@ -21,58 +21,66 @@ from LifeLineServer.models import Driver, Traffic, DriverSchema, TrafficSchema
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-
         token = None
         if 'x-access-token' in request.headers:
             token = request.headers['x-access-token']
         if not token:
-            return jsonify({'message' : 'Token missing'}), 401
+            return jsonify({'err' : 'Token missing'}), 401
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'])
-            print(data)
-            current_user = Traffic.query.filter_by(tid = data['id']).first()
+            current_user = Traffic.query.filter_by(contact = data['id']).first()
             users = Traffic.query.all()       
             for user in users:
                 user_data = {}
-                user_data['id'] = user.tid
-                if user.tid == current_user.tid and data['role'] == "traffic":
+                user_data['id'] = user.contact
+                if user.contact == current_user.contact and data['role'] == "traffic":
                     actual_user = current_user
-        except:
-            return jsonify({'message' : 'Invalid token'}), 401
+        except jwt.ExpiredSignatureError:
+            return jsonify({'err' : 'Signature expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'err' : 'Invalid token'}), 401
         return f(actual_user, *args, **kwargs)
     return decorated
-
-
-
-# Get single traffics
-@app.route('/traffic/<contact>', methods=['GET'])
-# @token_required
-def get_traffic(contact):
-    traffic = Traffic.query.filter_by(contact=contact).first()
-    return traffic_schema.jsonify(traffic)
-
-# Update a Traffic
-@app.route('/traffic/<contact>', methods=['PUT'])
-#@token_required
-def update_traffic(contact):
-    traffic = Traffic.query.filter_by(contact=contact).first()
-
-    if not traffic:
-        return jsonify({'message': 'no traffic found'})
-
-    if traffic.contact != request.json['contact']:
-        pic_loc = os.path.join(basedir, "User_pics/traffic",
-                           (str(request.json['contact'])+traffic.pic_location[-4:]))
-        os.rename(traffic.pic_location,pic_loc)
-        traffic.put_pic_loc(pic_loc)
-    traffic.update_data(request.json['name'], request.json['email'], request.json['contact'])
-    traffic_db.session.commit()
-
-    return traffic_schema.jsonify(traffic)
 
 # Init traffic schema
 traffic_schema = TrafficSchema()
 traffics_schema = TrafficSchema(many=True)
+
+# token auth
+@app.route('/traffic_check_token', methods=['POST'])
+@token_required
+def traffic_check_token(user):
+    if user:
+        token = jwt.encode(
+            {'id': user.contact, 'role': "traffic", 'exp': datetime.datetime.utcnow() + datetime.timedelta(days=2)}, 
+            app.config['SECRET_KEY'], 
+        )
+        return jsonify({'new_token': token.decode('UTF-8')})
+    else:
+        return jsonify({'err' : 'Invalid token'}), 401
+
+
+# login TrafficSchema http basic auth
+@app.route('/traffic_login', methods=['POST'])
+def login_traffic():
+    auth = request.authorization
+
+    if not auth or not auth.username or not auth.password:
+        return make_response('Login credentials missing', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
+
+    traffic = Traffic.query.filter_by(contact=auth.username).first()
+
+    if not traffic:
+        return make_response('Phone number is not registered yet', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
+
+    if check_password_hash(traffic.password, auth.password):
+        token = jwt.encode(
+            {'id': traffic.contact, 'role': 'traffic', 'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=15)}, 
+            app.config['SECRET_KEY']
+        )
+        return jsonify({'token': token.decode('UTF-8'), 'contact': traffic.contact, 'name': traffic.name, 'role': 'traffic'})
+
+    return make_response('Phone number and Password does not match', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
 # Traffic Sign up
 @app.route('/traffic_signup', methods=['POST'])
@@ -92,8 +100,7 @@ def Sign_up_traffic():
             return jsonify({'message': str(e.__dict__['orig'])})
         return traffic_schema.jsonify(new_traffic)
     else:
-        return jsonify({'message': 'Signup Unsuccessful invalid data'})
-
+        return jsonify({'err': 'Signup Unsuccessful invalid data'}), 401
 
 @app.route('/traffic_pic/<contact>', methods=['POST'])
 def update_traffic_pic(contact):
@@ -101,18 +108,15 @@ def update_traffic_pic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
     # check if the post request has the file part
     if 'file' not in request.files:
-        response = jsonify({'message': 'No file part in the request'})
-        response.status_code = 400
-        return response
+        response = jsonify({'err': 'No file part in the request'})
+        return response , 400
     file = request.files['file']
     if file.filename == '':
-        response = jsonify({'message': 'No file selected for uploading'})
-        response.status_code = 400
-        return response
+        response = jsonify({'err': 'No file selected for uploading'})
+        return response , 400
     if file.filename[-4:] != '.png' and file.filename[-4:] != '.jpg':
-        response = jsonify({'message': 'png or jpg not selected'})
-        response.status_code = 400
-        return response
+        response = jsonify({'err': 'png or jpg not selected'})
+        return response , 400
 
     try:
         os.remove(traffic.pic_location)
@@ -127,7 +131,14 @@ def update_traffic_pic(contact):
     response = jsonify({'message': 'File successfully uploaded'})
     traffic_db.session.commit()
     return response
-    
+
+# Get single traffics
+@app.route('/traffic/<contact>', methods=['GET'])
+# @token_required
+def get_traffic(contact):
+    traffic = Traffic.query.filter_by(contact=contact).first()
+    return traffic_schema.jsonify(traffic)
+
 
 # Get Traffics
 @app.route('/traffic', methods=['GET'])
@@ -156,14 +167,16 @@ def get_traffic_pic(contact):
     if   traffic.pic_location:
         return send_file(traffic.pic_location)
     else:
-        return jsonify({'message': 'No picture updated'})
+        response = jsonify({'err': 'Image not found'})
+        return response , 404
 
 # Get Traffic small pic
 @app.route('/traffic_small_pic/<contact>', methods=['GET'])
 def traffic_small_pic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
     if (not traffic.pic_location):
-        return jsonify({'message': 'No picture updated'})
+        response = jsonify({'err': 'Image not found'})
+        return response, 404
         
     image = Image.open(traffic.pic_location)
     new_image = image.resize((100, 100))
@@ -172,12 +185,54 @@ def traffic_small_pic(contact):
     img_str = base64.b64encode(buff.getvalue())
     return b'data:image/jpg;base64,'+img_str
 
+# Update a Traffic
+@app.route('/traffic/<contact>', methods=['PUT'])
+#@token_required
+def update_traffic(contact):
+    traffic = Traffic.query.filter_by(contact=contact).first()
+
+    if not traffic:
+        response = jsonify({'err': 'no traffic found'})
+        return response, 404
+
+    if traffic.contact != request.json['contact']:
+        pic_loc = os.path.join(basedir, "User_pics/traffic",
+                           (str(request.json['contact'])+traffic.pic_location[-4:]))
+        os.rename(traffic.pic_location,pic_loc)
+        traffic.put_pic_loc(pic_loc)
+    traffic.update_data(request.json['name'], request.json['email'], request.json['contact'])
+    traffic_db.session.commit()
+
+    return traffic_schema.jsonify(traffic)
+
+# Update a Traffic password
+@app.route('/traffic_password/<contact>', methods=['PUT'])
+#@token_required
+def update_traffic_password(contact):
+    traffic = Traffic.query.filter_by(contact=contact).first()
+
+    if not traffic:
+        response = jsonify({'err': 'no traffic found'})
+        return response, 404
+
+    if traffic.contact != request.json['contact']:
+        pic_loc = os.path.join(basedir, "User_pics/traffic",
+                           (str(request.json['contact'])+traffic.pic_location[-4:]))
+        os.rename(traffic.pic_location,pic_loc)
+        traffic.put_pic_loc(pic_loc)
+
+    password = hashed_password = generate_password_hash(request.json['password'], method='sha256')
+    traffic.update_password(password)
+    traffic_db.session.commit()
+
+    return traffic_schema.jsonify(traffic)
+
 # Delete traffics
 @app.route('/traffic/<contact>', methods=['DELETE'])
 def delete_traffic(contact):
     traffic = Traffic.query.filter_by(contact=contact).first()
     if not traffic:
-        return jsonify({'message': 'no traffic found'})
+        return jsonify({'err': 'no traffic found'}), 404
     try:
         os.remove(traffic.pic_location)
     except:
@@ -186,48 +241,3 @@ def delete_traffic(contact):
     traffic_db.session.commit()
     return traffic_schema.jsonify(traffic)
 
-# login TrafficSchema http basic auth
-@app.route('/traffic_login', methods=['POST'])
-def login_traffic():
-    auth = request.authorization
-
-    if not auth or not auth.username or not auth.password:
-        return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
-
-    traffic = Traffic.query.filter_by(contact=auth.username).first()
-
-    if not traffic:
-        return make_response('Could not verify2', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
-
-    if check_password_hash(traffic.password, auth.password):
-        token = jwt.encode({'id': traffic.contact, 'role': "traffic"}, app.config['SECRET_KEY'])
-        return jsonify({'token': token.decode('UTF-8'), 'contact': traffic.contact, 'name': traffic.name, 'role': 'traffic'})
-
-    return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
-
-# Test section
-@app.route('/file_upload', methods=['POST'])
-def upload_file():
-    # check if the post request has the file part
-    # check if the post request has the file part
-    if 'file' not in request.files:
-        response = jsonify({'message': 'No file part in the request'})
-        response.status_code = 400
-        return response
-    file = request.files['file']
-
-    if file.filename == '':
-        response = jsonify({'message': 'No file selected for uploading'})
-        response.status_code = 400
-        return response
-
-    filename = secure_filename(file.filename)
-    file.save(os.path.join(basedir, filename))
-    response = jsonify({'message': 'File successfully uploaded'})
-    response.status_code = 201
-    return response
-
-
-@app.route('/get_image')
-def get_image():
-    return send_file(os.path.join(basedir, "pic.png"))

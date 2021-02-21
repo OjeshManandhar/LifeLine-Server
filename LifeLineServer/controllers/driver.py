@@ -28,19 +28,21 @@ def token_required(f):
         if 'x-access-token' in request.headers:
             token = request.headers['x-access-token']
         if not token:
-            return jsonify({'message' : 'Token missing'}), 401
+            return jsonify({'err' : 'Token missing'}), 401
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'])
             print(data)
-            current_user = Driver.query.filter_by(tid = data['id']).first()
+            current_user = Driver.query.filter_by(contact = data['id']).first()
             users = Driver.query.all()       
             for user in users:
                 user_data = {}
-                user_data['id'] = user.tid
-                if user.tid == current_user.tid and data['role'] == "driver":
+                user_data['id'] = user.contact
+                if user.contact == current_user.contact and data['role'] == "driver":
                     actual_user = current_user
-        except:
-            return jsonify({'message' : 'Invalid token'}), 401
+        except jwt.ExpiredSignatureError:
+            return jsonify({'err' : 'Signature expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'err' : 'Invalid token'}), 401
         return f(actual_user, *args, **kwargs)
     return decorated
 
@@ -48,6 +50,34 @@ def token_required(f):
 # Init schema
 driver_schema = DriverSchema()
 drivers_schema = DriverSchema(many=True)
+
+# token auth
+@app.route('/driver_check_token', methods=['GET'])
+@token_required
+def driver_check_token(user):
+    if user:
+        token = jwt.encode(
+            {'id': user.contact, 'role': "driver", 'exp': datetime.datetime.utcnow() + datetime.timedelta(days=2)}, 
+            app.config['SECRET_KEY'], 
+        )
+        return jsonify({'new_token': token.decode('UTF-8')})
+    else:
+        return jsonify({'err' : 'Invalid token'}), 401
+
+# login DriverSchema http basic auth
+@app.route('/driver_login', methods=['POST'])
+def login():
+    auth = request.authorization
+    if not auth or not auth.username or not auth.password:
+        return make_response('Login credentials missing', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
+    driver = Driver.query.filter_by(contact=auth.username).first()
+    if not driver:
+        return make_response('Phone number is not registered yet', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
+    if check_password_hash(driver.password, auth.password):
+        token = jwt.encode({'id': driver.contact, 'role': "driver"}, app.config['SECRET_KEY'])
+        return jsonify({'token': token.decode('UTF-8'), 'contact': driver.contact, 'name': driver.name, 'role': 'driver'})
+
+    return make_response('Phone number and Password does not match', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
 
 
 # Sign up
@@ -70,7 +100,7 @@ def Sign_up_driver():
             return jsonify({'message': str(e.__dict__['orig'])})
         return driver_schema.jsonify(new_driver)
     else:
-        return jsonify({'message': 'Signup Unsuccessful invalid data'})
+        return jsonify({'err': 'Signup Unsuccessful invalid data'}), 401
 
 
 
@@ -79,18 +109,15 @@ def update_driver_pic(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     # check if the post request has the file part
     if 'file' not in request.files:
-        response = jsonify({'message': 'No file part in the request'})
-        response.status_code = 400
-        return response
+        response = jsonify({'err': 'No file part in the request'})
+        return response , 400
     file = request.files['file']
     if file.filename == '':
-        response = jsonify({'message': 'No file selected for uploading'})
-        response.status_code = 400
-        return response
+        response = jsonify({'err': 'No file selected for uploading'})
+        return response , 400
     if file.filename[-4:] != '.png' and file.filename[-4:] != '.jpg':
-        response = jsonify({'message': 'png or jpg not selected'})
-        response.status_code = 400
-        return response
+        response = jsonify({'err': 'png or jpg not selected'})
+        return response , 400
 
     pic_loc = os.path.join(basedir, "User_pics/driver",
                            (str(driver.contact)+file.filename[-4:]))
@@ -135,14 +162,14 @@ def get_driver_pic(contact):
     if driver.pic_location:
         return send_file(driver.pic_location)
     else:
-        return jsonify({'message': 'No picture updated'})
+        return jsonify({'err': 'Image not found'}), 404
 
 # Get driver small pic
 @app.route('/driver_small_pic/<contact>', methods=['GET'])
 def get_driver_small_pic(contact):
     driver = Driver.query.filter_by(contact=contact).first()
     if (not (driver.pic_location)):
-        return jsonify({'message': 'No picture updated'})
+        return jsonify({'err': 'Image not found'}), 404
     image = Image.open(driver.pic_location)
     new_image = image.resize((100, 100))
     buff = BytesIO()
@@ -165,14 +192,35 @@ def update_driver(contact):
     driver = Driver.query.filter_by(contact=contact).first()
 
     if not driver:
-        return jsonify({'message': 'no driver found'})
-    print(driver.contact, request.json['contact'])
+        return jsonify({'err': 'no driver found'}), 404
     if driver.contact != request.json['contact']:
         pic_loc = os.path.join(basedir, "User_pics/driver",
                            (str(request.json['contact'])+driver.pic_location[-4:]))
         os.rename(driver.pic_location,pic_loc)
         driver.put_pic_loc(pic_loc)
     driver.update_data(request.json['name'], request.json['driver_id'], request.json['email'], request.json['contact'])
+    driver_db.session.commit()
+
+    return driver_schema.jsonify(driver)
+
+# Update a Driver password
+@app.route('/driver_password/<contact>', methods=['PUT'])
+#@token_required
+def update_driver_password(contact):
+    driver = Driver.query.filter_by(contact=contact).first()
+
+    if not driver:
+        response = jsonify({'err': 'no driver found'})
+        return response, 404
+
+    if driver.contact != request.json['contact']:
+        pic_loc = os.path.join(basedir, "User_pics/driver",
+                           (str(request.json['contact'])+driver.pic_location[-4:]))
+        os.rename(driver.pic_location,pic_loc)
+        driver.put_pic_loc(pic_loc)
+
+    password = hashed_password = generate_password_hash(request.json['password'], method='sha256')
+    driver.update_password(password)
     driver_db.session.commit()
 
     return driver_schema.jsonify(driver)
@@ -187,27 +235,7 @@ def delete_driver(contact):
     except:
         print("no_pic-")
     if not driver:
-        return jsonify({'message': 'no driver found'})
+        return jsonify({'err': 'no driver found'}), 404
     driver_db.session.delete(driver)
     driver_db.session.commit()
     return driver_schema.jsonify(driver)
-
-# login DriverSchema http basic auth
-@app.route('/driver_login', methods=['POST'])
-def login():
-    auth = request.authorization
-    print(request)
-
-    if not auth or not auth.username or not auth.password:
-        return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
-
-    driver = Driver.query.filter_by(contact=auth.username).first()
-
-    if not driver:
-        return make_response('Could not verify2', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
-
-    if check_password_hash(driver.password, auth.password):
-        token = jwt.encode({'id': driver.contact, 'role': "driver"}, app.config['SECRET_KEY'])
-        return jsonify({'token': token.decode('UTF-8'), 'contact': driver.contact, 'name': driver.name, 'role': 'driver'})
-
-    return make_response('Could not verify3', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
