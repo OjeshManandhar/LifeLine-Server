@@ -74,7 +74,10 @@ def login():
     if not driver:
         return make_response('Phone number is not registered yet', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
     if check_password_hash(driver.password, auth.password):
-        token = jwt.encode({'id': driver.contact, 'role': "driver"}, app.config['SECRET_KEY'])
+        token = jwt.encode(
+            {'id': user.contact, 'role': "driver", 'exp': datetime.datetime.utcnow() + datetime.timedelta(days=2)}, 
+            app.config['SECRET_KEY'], 
+        )
         return jsonify({'token': token.decode('UTF-8'), 'contact': driver.contact, 'name': driver.name, 'role': 'driver'})
 
     return make_response('Phone number and Password does not match', 401, {'WWW-Authenticate': 'Basic realm = "Login required!"'})
@@ -91,7 +94,7 @@ def Sign_up_driver():
     password = request.json['password']
     email_regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
     if(re.search(email_regex,email) and len(str(contact)) == 10 and len(password)>7): 
-        hashed_password = generate_password_hash(password, method='sha256')
+        hashed_password = generate_password_hash(password, method='sha256:100')
         new_driver = Driver(name, driver_id, email, contact, hashed_password)
         driver_db.session.add(new_driver)
         try:
@@ -219,7 +222,7 @@ def update_driver_password(contact):
         os.rename(driver.pic_location,pic_loc)
         driver.put_pic_loc(pic_loc)
 
-    password = hashed_password = generate_password_hash(request.json['password'], method='sha256')
+    password = hashed_password = generate_password_hash(request.json['password'], method='sha256:100')
     driver.update_password(password)
     driver_db.session.commit()
 
