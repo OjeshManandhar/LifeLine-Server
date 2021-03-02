@@ -75,8 +75,8 @@ def login_traffic():
 
     if check_password_hash(traffic.password, auth.password):
         token = jwt.encode(
-            {'id': traffic.contact, 'role': 'traffic', 'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=15)}, 
-            app.config['SECRET_KEY']
+            {'id': user.contact, 'role': "traffic", 'exp': datetime.datetime.utcnow() + datetime.timedelta(days=2)}, 
+            app.config['SECRET_KEY'], 
         )
         return jsonify({'token': token.decode('UTF-8'), 'contact': traffic.contact, 'name': traffic.name, 'role': 'traffic'})
 
